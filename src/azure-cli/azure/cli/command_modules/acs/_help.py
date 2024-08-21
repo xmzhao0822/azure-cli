@@ -226,6 +226,8 @@ parameters:
                                          Specify "--enable-msi-auth-for-monitoring" to use Managed Identity Auth.
                                          Specify "--enable-syslog" to enable syslog data collection from nodes. Note MSI must be enabled
                                          Specify "--data-collection-settings" to configure data collection settings
+                                         Specify "--ampls-resource-id" for private link. Note MSI must be enabled.
+                                         Specify "--enable-high-log-scale-mode" to enable high log scale mode for container logs. Note MSI must be enabled.
                                          If monitoring addon is enabled --no-wait argument will have no effect
             - azure-policy             : enable Azure policy. The Azure Policy add-on for AKS enables at-scale enforcements and safeguards on your clusters in a centralized, consistent manner.
                                          Learn more at aka.ms/aks/policy.
@@ -254,11 +256,14 @@ parameters:
         --network-plugin=azure will use an overlay network (non-VNET IPs) for pods in the cluster.
   - name: --network-policy
     type: string
-    short-summary: The Kubernetes network policy to use.
+    short-summary: Network Policy Engine to use.
     long-summary: |
-        Using together with "azure" network plugin.
-        Specify "azure" for Azure network policy manager, "calico" for calico network policy controller, "cilium" for Azure CNI powered by Cilium.
-        Defaults to "" (network policy disabled).
+        Azure provides three Network Policy Engines for enforcing network policies that can be used together with "azure" network plugin. The following values can be specified:
+          - "azure" for Azure Network Policy Manager,
+          - "cilium" for Azure CNI Powered by Cilium,
+          - "calico" for open-source network and network security solution founded by Tigera,
+          - "none" when no Network Policy Engine is installed (default value).
+        Defaults to "none" (network policy disabled).
   - name: --network-dataplane
     type: string
     short-summary: The network dataplane to use.
@@ -316,6 +321,12 @@ parameters:
   - name: --data-collection-settings
     type: string
     short-summary: Path to JSON file containing data collection settings for Monitoring addon.
+  - name: --ampls-resource-id
+    type: string
+    short-summary: Resource ID of Azure Monitor Private Link scope for Monitoring Addon.
+  - name: --enable-high-log-scale-mode
+    type: bool
+    short-summary: Enable High Log Scale Mode for Container Logs.
   - name: --uptime-sla
     type: bool
     short-summary: --uptime-sla is deprecated. Please use '--tier standard' instead.
@@ -343,7 +354,7 @@ parameters:
     short-summary: Comma-separated list of authorized apiserver IP ranges. Set to 0.0.0.0/32 to restrict apiserver traffic to node pools.
   - name: --enable-managed-identity
     type: bool
-    short-summary: Using a system assigned managed identity to manage cluster resource group.
+    short-summary: Using a system assigned managed identity to manage cluster resource group. You can explicitly specify "--service-principal" and "--client-secret" to disable managed identity, otherwise it will be enabled.
   - name: --assign-identity
     type: string
     short-summary: Specify an existing user assigned identity for control plane's usage in order to manage cluster resource group.
@@ -537,6 +548,9 @@ parameters:
   - name: --revision
     type: string
     short-summary: Azure Service Mesh revision to install.
+  - name: --enable-cost-analysis
+    type: bool
+    short-summary: Enable exporting Kubernetes Namespace and Deployment details to the Cost Analysis views in the Azure portal. For more information see aka.ms/aks/docs/cost-analysis.
 
 examples:
   - name: Create a Kubernetes cluster with an existing SSH public key.
@@ -545,8 +559,6 @@ examples:
     text: az aks create -g MyResourceGroup -n MyManagedCluster --kubernetes-version 1.16.9
   - name: Create a Kubernetes cluster with a larger node pool.
     text: az aks create -g MyResourceGroup -n MyManagedCluster --node-count 7
-  - name: Create a kubernetes cluster with k8s 1.13.9 but use vmas.
-    text: az aks create -g MyResourceGroup -n MyManagedCluster --kubernetes-version 1.16.9 --vm-set-type AvailabilitySet
   - name: Create a kubernetes cluster with default kubernetes version, default SKU load balancer (Standard) and default vm set type (VirtualMachineScaleSets).
     text: az aks create -g MyResourceGroup -n MyManagedCluster
   - name: Create a kubernetes cluster with standard SKU load balancer and two AKS created IPs for the load balancer outbound connection usage.
@@ -654,10 +666,14 @@ parameters:
     short-summary: Update the mode of a network plugin to migrate to a different pod networking setup.
   - name: --network-policy
     type: string
-    short-summary: Update the mode of a network policy.
+    short-summary: Update Network Policy Engine.
     long-summary: |
-        Specify "azure" for Azure network policy manager, "cilium" for Azure CNI powered by Cilium.
-        Defaults to "" (network policy disabled).
+        Azure provides three Network Policy Engines for enforcing network policies. The following values can be specified:
+          - "azure" for Azure Network Policy Manager,
+          - "cilium" for Azure CNI Powered by Cilium,
+          - "calico" for open-source network and network security solution founded by Tigera,
+          - "none" to uninstall Network Policy Engine (Azure Network Policy Manager or Calico).
+        Defaults to "none" (network policy disabled).
   - name: --pod-cidr
     type: string
     short-summary: Update the pod CIDR for a cluster. Used when updating a cluster from Azure CNI to Azure CNI Overlay.
@@ -937,6 +953,12 @@ parameters:
   - name: --upgrade-override-until
     type: string
     short-summary: Until when the cluster upgradeSettings overrides are effective. It needs to be in a valid date-time format that's within the next 30 days. For example, 2023-04-01T13:00:00Z. Note that if --force-upgrade is set to true and --upgrade-override-until is not set, by default it will be set to 3 days from now.
+  - name: --enable-cost-analysis
+    type: bool
+    short-summary: Enable exporting Kubernetes Namespace and Deployment details to the Cost Analysis views in the Azure portal. For more information see aka.ms/aks/docs/cost-analysis.
+  - name: --disable-cost-analysis
+    type: bool
+    short-summary: Disable exporting Kubernetes Namespace and Deployment details to the Cost Analysis views in the Azure portal.
 
 examples:
   - name: Reconcile the cluster back to its current state.
@@ -1029,7 +1051,9 @@ long-summary: |-
     - http_application_routing : configure ingress with automatic public DNS name creation.
     - monitoring               : turn on Log Analytics monitoring. Requires "--workspace-resource-id".
                                  Requires "--enable-msi-auth-for-monitoring" for managed identity auth.
-                                 Requires "--enable-syslog" to enable syslog data collection from nodes. Note MSI must be enabled
+                                 Requires "--enable-syslog" to enable syslog data collection from nodes. Note MSI must be enabled.
+                                 Requires "--ampls-resource-id" for private link. Note MSI must be enabled.
+                                 Requires "--enable-high-log-scale-mode" to enable high log scale mode for container logs. Note MSI must be enabled.
                                  If monitoring addon is enabled --no-wait argument will have no effect
     - virtual-node             : enable AKS Virtual Node. Requires --subnet-name to provide the name of an existing subnet for the Virtual Node to use.
     - azure-policy             : enable Azure policy. The Azure Policy add-on for AKS enables at-scale enforcements and safeguards on your clusters in a centralized, consistent manner.
@@ -1053,6 +1077,12 @@ parameters:
   - name: --data-collection-settings
     type: string
     short-summary: Path to JSON file containing data collection settings for Monitoring addon.
+  - name: --ampls-resource-id
+    type: string
+    short-summary: Resource ID of Azure Monitor Private Link scope for Monitoring Addon.
+  - name: --enable-high-log-scale-mode
+    type: bool
+    short-summary: Enable High Log Scale Mode for Container Logs.
   - name: --appgw-name
     type: string
     short-summary: Name of the application gateway to create/use in the node resource group. Use with ingress-azure addon.
@@ -1568,6 +1598,9 @@ parameters:
   - name: --crg-id
     type: string
     short-summary: The crg id used to associate the new nodepool with the existed Capacity Reservation Group resource.
+  - name: --disable-windows-outbound-nat
+    type: bool
+    short-summary: Disable Windows OutboundNAT on Windows agent node pool.
 
 examples:
   - name: Create a nodepool in an existing AKS cluster with ephemeral os enabled.
@@ -1671,6 +1704,15 @@ parameters:
   - name: --asg-ids
     type: string
     short-summary: The IDs of the application security groups to which the node pool's network interface should belong. When specified, format should be a space-separated list of IDs.
+  - name: --os-sku
+    type: string
+    short-summary: The os-sku of the agent node pool.
+  - name: --enable-fips-image
+    type: bool
+    short-summary: Switch to use FIPS-enabled OS on agent nodes.
+  - name: --disable-fips-image
+    type: bool
+    short-summary: Switch to use non-FIPS-enabled OS on agent nodes.
 examples:
   - name: Reconcile the nodepool back to its current state.
     text: az aks nodepool update -g MyResourceGroup -n nodepool1 --cluster-name MyManagedCluster
@@ -1857,6 +1899,12 @@ parameters:
     type: string
     short-summary: Until when the cluster upgradeSettings overrides are effective.
     long-summary: It needs to be in a valid date-time format that's within the next 30 days. For example, 2023-04-01T13:00:00Z. Note that if --force-upgrade is set to true and --upgrade-override-until is not set, by default it will be set to 3 days from now.
+  - name: --k8s-support-plan
+    type: string
+    short-summary: Choose from "KubernetesOfficial" or "AKSLongTermSupport", with "AKSLongTermSupport" you get 1 extra year of CVE patchs.
+  - name: --tier
+    type: string
+    short-summary: Specify SKU tier for managed clusters. '--tier standard' enables a standard managed cluster service with a financially backed SLA. '--tier free' does not have a financially backed SLA. '--tier premium' is required for '--k8s-support-plan AKSLongTermSupport'.
 
 examples:
   - name: Upgrade a managed Kubernetes cluster to a newer version. (autogenerated)
